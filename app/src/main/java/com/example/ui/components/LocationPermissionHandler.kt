@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.data.SoftKeeperRepository
+import com.example.service.LocationUpdatesService
 import com.example.ui.theme.DarkBluePrimary
 import com.example.ui.theme.EmeraldAccent
 import com.google.android.gms.location.*
@@ -35,6 +36,10 @@ fun LocationPermissionHandler(
     onLocationUpdated: ((Double, Double) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val currentDriver by SoftKeeperRepository.currentUser.collectAsState()
+    val driverProfile by SoftKeeperRepository.currentDriverProfile.collectAsState()
+    val activeRide by SoftKeeperRepository.activeRide.collectAsState()
+
     var hasLocationPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -51,7 +56,18 @@ fun LocationPermissionHandler(
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
     }
 
-    LaunchedEffect(hasLocationPermission) {
+    LaunchedEffect(hasLocationPermission, driverProfile?.isOnline, currentDriver?.id, activeRide?.id) {
+        if (hasLocationPermission && driverProfile?.isOnline == true && currentDriver != null) {
+            LocationUpdatesService.startService(
+                context = context,
+                driverId = currentDriver!!.id,
+                driverName = currentDriver!!.name,
+                rideId = activeRide?.id
+            )
+        } else {
+            LocationUpdatesService.stopService(context)
+        }
+
         if (hasLocationPermission) {
             try {
                 val fusedLocationClient: FusedLocationProviderClient =
