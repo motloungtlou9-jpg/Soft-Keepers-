@@ -1,0 +1,30 @@
+workflows:
+  android-release-apk:
+    name: Android Release APK
+    instance_type: mac_mini_m1 # faster builds
+    max_build_duration: 60
+    environment:
+      groups:
+        - google_play # only if you add keystore secrets later
+      android_signing:
+        - keystore_reference
+    scripts:
+      - name: Set up local.properties
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
+      
+      - name: Build Release APK
+        script: |
+          cd $CM_BUILD_DIR
+          ./gradlew :app:assembleRelease
+      
+      - name: Upload APK
+        script: |
+          cd $CM_BUILD_DIR
+          ls -la app/build/outputs/apk/release/
+    artifacts:
+      - app/build/outputs/apk/release/*.apk
+    publishing:
+      email:
+        recipients:
+          -motloungtlou9@gmail.com # 
