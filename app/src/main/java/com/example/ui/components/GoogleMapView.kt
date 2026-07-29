@@ -1,6 +1,8 @@
 package com.example.ui.components
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -36,6 +38,7 @@ fun GoogleMapView(
     dropoffLat: Double = -26.13,
     dropoffLng: Double = 28.24,
     showDriver: Boolean = true,
+    isTripStarted: Boolean = false,
     driverMessage: String? = null,
     modifier: Modifier = Modifier
 ) {
@@ -45,6 +48,26 @@ fun GoogleMapView(
     val driverPos = LatLng(driverLat, driverLng)
     val pickupPos = LatLng(pickupLat, pickupLng)
     val dropoffPos = LatLng(dropoffLat, dropoffLng)
+
+    // Calculate ETA and Distance
+    val targetLat = if (isTripStarted) dropoffLat else pickupLat
+    val targetLng = if (isTripStarted) dropoffLng else pickupLng
+
+    val (rawEtaMins, distanceKm) = remember(driverLat, driverLng, targetLat, targetLng) {
+        calculateEtaAndDistance(driverLat, driverLng, targetLat, targetLng)
+    }
+
+    val animatedEta by animateIntAsState(
+        targetValue = rawEtaMins,
+        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+        label = "etaAnimation"
+    )
+
+    val animatedDistance by animateFloatAsState(
+        targetValue = distanceKm.toFloat(),
+        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+        label = "distanceAnimation"
+    )
 
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(
@@ -231,6 +254,37 @@ fun GoogleMapView(
             }
         }
 
+        // Animated ETA Live Badge Overlay (Top Center)
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 12.dp)
+                .shadow(6.dp, RoundedCornerShape(20.dp))
+                .testTag("eta_badge"),
+            color = DarkBluePrimary,
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, EmeraldAccent.copy(alpha = 0.6f))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Timer,
+                    contentDescription = "ETA",
+                    tint = EmeraldAccent,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "ETA: $animatedEta min${if (animatedEta > 1) "s" else ""} (${"%.1f".format(animatedDistance)} km)",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
         // Driver Message Toast Overlay (Bottom Center)
         if (!driverMessage.isNullOrEmpty()) {
             Surface(
@@ -264,3 +318,22 @@ fun GoogleMapView(
         }
     }
 }
+
+fun calculateEtaAndDistance(
+    driverLat: Double,
+    driverLng: Double,
+    destLat: Double,
+    destLng: Double
+): Pair<Int, Double> {
+    val R = 6371.0
+    val dLat = Math.toRadians(destLat - driverLat)
+    val dLon = Math.toRadians(destLng - driverLng)
+    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(Math.toRadians(driverLat)) * Math.cos(Math.toRadians(destLat)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    val distanceKm = R * c
+    val etaMins = (distanceKm * 2.5).toInt().coerceAtLeast(1)
+    return Pair(etaMins, distanceKm)
+}
+

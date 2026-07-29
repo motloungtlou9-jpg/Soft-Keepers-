@@ -559,6 +559,20 @@ object SoftKeeperRepository {
 
     // --- Ride Requests Logic ---
 
+    private var rideListenerJob: kotlinx.coroutines.Job? = null
+
+    private fun startObservingRide(rideId: String) {
+        rideListenerJob?.cancel()
+        rideListenerJob = scope.launch {
+            FirestoreLocationRepository.observeRide(rideId).collect { remoteRide ->
+                if (remoteRide != null) {
+                    _activeRide.value = remoteRide
+                    _allRides.value = _allRides.value.map { if (it.id == remoteRide.id) remoteRide else it }
+                }
+            }
+        }
+    }
+
     fun requestTransport(
         pickupAddress: String,
         dropoffAddress: String,
@@ -588,6 +602,10 @@ object SoftKeeperRepository {
 
         _allRides.value = listOf(ride) + _allRides.value
         _activeRide.value = ride
+        startObservingRide(ride.id)
+
+        // Sync to Firestore for real-time lifecycle tracking
+        FirestoreLocationRepository.syncRideToFirestore(ride)
 
         // Notify drivers
         addNotification("New Ride Request", "New transport request near $pickupAddress ($$fare)", "DRIVER")
@@ -606,6 +624,7 @@ object SoftKeeperRepository {
                 _activeRide.value = null
             }
         }
+        FirestoreLocationRepository.updateRideStatusInFirestore(rideId, RideStatus.CANCELLED)
     }
 
     fun driverOfferFare(rideId: String, offerAmount: Double) {
@@ -628,6 +647,10 @@ object SoftKeeperRepository {
         _allRides.value = rides
         val updatedRide = rides.find { it.id == rideId }
         _activeRide.value = updatedRide
+        if (updatedRide != null) {
+            startObservingRide(updatedRide.id)
+            FirestoreLocationRepository.syncRideToFirestore(updatedRide)
+        }
 
         addNotification(
             "Fare Offer Received (R $offerAmount)",
@@ -655,6 +678,9 @@ object SoftKeeperRepository {
         _allRides.value = rides
         val updatedRide = rides.find { it.id == rideId }
         _activeRide.value = updatedRide
+        if (updatedRide != null) {
+            FirestoreLocationRepository.syncRideToFirestore(updatedRide)
+        }
 
         addNotification(
             "🎉 Fare Offer Approved!",
@@ -687,6 +713,9 @@ object SoftKeeperRepository {
         _allRides.value = rides
         val updatedRide = rides.find { it.id == rideId }
         _activeRide.value = updatedRide
+        if (updatedRide != null) {
+            FirestoreLocationRepository.syncRideToFirestore(updatedRide)
+        }
 
         addNotification(
             "Fare Offer Passed",
@@ -715,6 +744,15 @@ object SoftKeeperRepository {
         _allRides.value = rides
         val updatedRide = rides.find { it.id == rideId }
         _activeRide.value = updatedRide
+        if (updatedRide != null) {
+            FirestoreLocationRepository.updateRideStatusInFirestore(
+                rideId = rideId,
+                status = RideStatus.DRIVER_ON_THE_WAY,
+                driverId = driver.id,
+                driverName = driver.name,
+                quickMessage = customReply
+            )
+        }
 
         addNotification(
             "🚖 Driver Coming!",
@@ -746,6 +784,11 @@ object SoftKeeperRepository {
         _activeRide.value = updated
 
         _allRides.value = _allRides.value.map { if (it.id == current.id) updated else it }
+        FirestoreLocationRepository.updateRideStatusInFirestore(
+            rideId = current.id,
+            status = status,
+            quickMessage = quickMsg ?: current.quickMessage
+        )
 
         // Notify passenger
         val statusText = when (status) {

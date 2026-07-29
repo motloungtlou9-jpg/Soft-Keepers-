@@ -341,9 +341,14 @@ fun RequestTransportTab(activeRide: Ride?) {
             GoogleMapView(
                 pickupAddress = activeRide.pickupAddress,
                 dropoffAddress = activeRide.dropoffAddress,
+                pickupLat = activeRide.pickupLat,
+                pickupLng = activeRide.pickupLng,
+                dropoffLat = activeRide.dropoffLat,
+                dropoffLng = activeRide.dropoffLng,
                 driverLat = activeRide.driverLat,
                 driverLng = activeRide.driverLng,
                 showDriver = activeRide.driverId != null,
+                isTripStarted = activeRide.status == RideStatus.TRIP_STARTED,
                 driverMessage = activeRide.quickMessage,
                 modifier = Modifier
                     .fillMaxWidth()

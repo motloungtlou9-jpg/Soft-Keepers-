@@ -277,9 +277,14 @@ fun DriverRequestsTab(activeRide: Ride?, waitingRides: List<Ride>) {
             GoogleMapView(
                 pickupAddress = activeRide.pickupAddress,
                 dropoffAddress = activeRide.dropoffAddress,
+                pickupLat = activeRide.pickupLat,
+                pickupLng = activeRide.pickupLng,
+                dropoffLat = activeRide.dropoffLat,
+                dropoffLng = activeRide.dropoffLng,
                 driverLat = activeRide.driverLat,
                 driverLng = activeRide.driverLng,
                 showDriver = true,
+                isTripStarted = activeRide.status == RideStatus.TRIP_STARTED,
                 driverMessage = activeRide.quickMessage,
                 modifier = Modifier.fillMaxWidth().weight(1f)
             )
