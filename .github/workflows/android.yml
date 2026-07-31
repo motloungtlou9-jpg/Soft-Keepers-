@@ -1,4 +1,4 @@
-name: Build Soft Keeper APK
+name: Build Soft-Keepers APK
 
 on:
   workflow_dispatch:
