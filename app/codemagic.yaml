@@ -1,16 +1,20 @@
 workflows:
-  android-workflow:
-    name: Android Workflow
-    max_build_duration: 120
+  assemble-debug-apk:
+    name: Assemble Debug APK
+    max_build_duration: 60
     instance_type: mac_mini_m1
     environment:
       java: 17
     scripts:
-      - name: Build Android Debug APK
+      - name: Make gradlew executable
+        script: chmod +x gradlew
+      - name: Generate debug.keystore
         script: |
-          ./gradlew assembleDebug
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+      - name: Build Debug APK
+        script: ./gradlew assembleDebug
     artifacts:
-      - app/build/outputs/apk/debug/*.apk
+      - build/outputs/apk/debug/*.apk
     publishing:
       email:
         recipients:
